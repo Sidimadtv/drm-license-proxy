@@ -63,7 +63,7 @@ fetch(proxy + target, {
         <ul>
             <li>✅ <strong>Zero-Logs:</strong> No request data is stored.</li>
             <li>✅ <strong>Stealth Mode:</strong> All Cloudflare "Junk" headers are stripped.</li>
-            <li>✅ <strong>Binary Safe:</strong> Direct streaming of octet-stream buffers.</li>
+            <li>✅ <strong>Spoofing:</strong> Fakes Origin/Referer to bypass domain checks.</li>
         </ul>
     </div>
 </body>
@@ -77,6 +77,7 @@ fetch(proxy + target, {
     // 4. PROXY MODE (Strict Stealth Logic)
     try {
       const targetUrl = new URL(target);
+      const originUrl = targetUrl.protocol + "//" + targetUrl.host;
 
       // AGGRESSIVE BLACKLIST
       const blacklist = [
@@ -94,13 +95,13 @@ fetch(proxy + target, {
         }
       }
 
-      // Re-write Host to trick the target server
+      // --- THE FIX: SPOOFING ORIGIN & REFERER ---
       cleanHeaders.set("Host", targetUrl.host);
+      cleanHeaders.set("Origin", originUrl);
+      cleanHeaders.set("Referer", originUrl + "/");
 
-      // Optional: Set a common User-Agent if the site is strict
-      if (!cleanHeaders.has("user-agent")) {
-          cleanHeaders.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
-      }
+      // Set a clean User-Agent to look like a browser
+      cleanHeaders.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
 
       // 5. Fetch from Target
       const response = await fetch(target, {
@@ -113,7 +114,7 @@ fetch(proxy + target, {
       // 6. Final Header Cleanup for Response
       const responseHeaders = new Headers(response.headers);
       
-      // Inject CORS
+      // Inject CORS back to your player
       Object.keys(corsHeaders).forEach(key => {
         responseHeaders.set(key, corsHeaders[key]);
       });
