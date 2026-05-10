@@ -30,7 +30,8 @@ exports.handler = async (event, context) => {
             'host', 'connection', 'content-length', 'transfer-encoding', 'keep-alive',
             'x-nf-client-connection-ip', 'x-nf-request-id', 'x-nf-parameters', 'x-nf-account-id',
             'via', 'forwarded', 'x-forwarded-for', 'x-forwarded-proto', 'x-bb-ip',
-            'cf-ray', 'cf-connecting-ip', 'x-vercel-id', 'x-vercel-proxy-signature'
+            'cf-ray', 'cf-connecting-ip', 'x-vercel-id', 'x-vercel-proxy-signature','cdn-loop',
+'netlify-agent-category','netlify-invocation-source'
         ];
 
         const cleanHeaders = {};
