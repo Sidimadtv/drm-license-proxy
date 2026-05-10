@@ -5,6 +5,9 @@
 
 https://drm-license-proxy.vercel.app/proxy?target=https%3A%2F%2Flicense.provider.com%2Fwidevine
 
+Your DRM Proxy is now fully operational. You can plug https://drmmm.netlify.app/proxy?target= into any player and start streaming!
+
+Cmd tests
 
 curl -i -X POST "https://drm-license-proxy.vercel.app/proxy?target=https://httpbin.org/post" -H "Content-Type: application/octet-stream" -d "DRM_CHALLENGE_DATA"
 
