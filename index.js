@@ -3,30 +3,47 @@ export default {
     const url = new URL(request.url);
     const target = url.searchParams.get("target");
 
-    // 1. Handle CORS Preflight
+    // 1. Standard CORS Headers
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
       "Access-Control-Allow-Headers": "*",
+      "Access-Control-Allow-Credentials": "true",
     };
 
+    // 2. Handle CORS Preflight (OPTIONS)
     if (request.method === "OPTIONS") {
-      return new Response(null, { headers: corsHeaders });
+      return new Response(null, { 
+        headers: corsHeaders 
+      });
     }
 
     if (!target) {
-      return new Response("Missing target", { status: 400, headers: corsHeaders });
+      return new Response("Missing target parameter", { 
+        status: 400, 
+        headers: corsHeaders 
+      });
     }
 
     try {
       const targetUrl = new URL(target);
 
-      // 2. UNIVERSAL BLACKLIST
-      // Cloudflare adds its own headers (cf-*) that we want to strip
+      // 3. UNIVERSAL BLACKLIST
+      // We strip these headers so the target server doesn't see Cloudflare/Proxy info
       const blacklist = [
-        "cf-connecting-ip", "cf-ipcountry", "cf-ray", "cf-visitor",
-        "connection", "content-length", "host", "x-forwarded-proto",
-        "x-real-ip", "x-frame-options"
+        "cf-connecting-ip", 
+        "cf-ipcountry", 
+        "cf-ray", 
+        "cf-visitor",
+        "cf-worker",
+        "cf-ew-via",
+        "cdn-loop",
+        "connection", 
+        "content-length", 
+        "host", 
+        "x-forwarded-proto",
+        "x-real-ip", 
+        "x-frame-options"
       ];
 
       const cleanHeaders = new Headers();
@@ -36,11 +53,11 @@ export default {
         }
       }
 
-      // Force the Host header for the destination
+      // Force the Host header to match the destination server
       cleanHeaders.set("Host", targetUrl.host);
 
-      // 3. Execute Proxy Request
-      // We pass the request body directly as a stream (super efficient)
+      // 4. Execute Proxy Request
+      // Cloudflare streams the body automatically, keeping binary data intact
       const response = await fetch(target, {
         method: request.method,
         headers: cleanHeaders,
@@ -48,14 +65,19 @@ export default {
         redirect: "follow",
       });
 
-      // 4. Return Response to Client
+      // 5. Prepare Response Headers
       const responseHeaders = new Headers(response.headers);
       
-      // Inject CORS into the response from the license server
+      // Inject CORS headers into the final response
       Object.keys(corsHeaders).forEach(key => {
         responseHeaders.set(key, corsHeaders[key]);
       });
 
+      // Ensure we don't leak the target's original security headers that might break the proxy
+      responseHeaders.delete("content-security-policy");
+      responseHeaders.delete("x-frame-options");
+
+      // 6. Return the streamed response
       return new Response(response.body, {
         status: response.status,
         statusText: response.statusText,
