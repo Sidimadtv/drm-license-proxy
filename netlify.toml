@@ -2,13 +2,13 @@
   functions = "api"
   publish = "."
 
-# Matches your first rewrite: /proxy -> /api/proxy
 [[redirects]]
+  # This keeps your external URL as /proxy
   from = "/proxy"
-  to = "/.netlify/functions/proxy"
+  # This points it to your new api/netlify.js file
+  to = "/.netlify/functions/netlify"
   status = 200
 
-# Matches your second rewrite: everything else -> index.html
 [[redirects]]
   from = "/*"
   to = "/index.html"
