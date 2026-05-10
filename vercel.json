@@ -1,7 +1,13 @@
 {
   "version": 2,
   "rewrites": [
-    { "source": "/proxy", "destination": "/api/proxy" },
-    { "source": "/", "destination": "/index.html" }
+    {
+      "source": "/proxy",
+      "destination": "/api/proxy"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
   ]
 }
