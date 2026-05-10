@@ -1,43 +1,49 @@
 const fetch = require('node-fetch');
 
-// NEW: Use the Netlify export style
 exports.handler = async (event, context) => {
-    // Check if it's an OPTIONS request (CORS)
+    // 1. CORS Preflight
+    const corsHeaders = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': '*',
+        'Access-Control-Allow-Methods': '*'
+    };
+
     if (event.httpMethod === 'OPTIONS') {
-        return {
-            statusCode: 200,
-            headers: {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Headers': '*',
-                'Access-Control-Allow-Methods': '*'
-            }
-        };
+        return { statusCode: 200, headers: corsHeaders, body: '' };
     }
 
     const target = event.queryStringParameters.target;
-    if (!target) return { statusCode: 400, body: 'Missing target' };
+    if (!target) return { statusCode: 400, headers: corsHeaders, body: 'Missing target' };
 
     try {
         const targetUrl = new URL(target);
-        
-        // 1. Handle incoming Body (Base64 for binary DRM data)
+
+        // 2. Handle incoming Body (Binary safety)
         let rawBody = event.body;
         if (event.isBase64Encoded && event.body) {
             rawBody = Buffer.from(event.body, 'base64');
         }
 
-        // 2. Clean headers
+        // 3. UNIVERSAL BLACKLIST
+        // These headers are removed to make the proxy look like a clean, direct request
+        const blacklist = [
+            'host', 'connection', 'content-length', 'transfer-encoding', 'keep-alive',
+            'x-nf-client-connection-ip', 'x-nf-request-id', 'x-nf-parameters', 'x-nf-account-id',
+            'via', 'forwarded', 'x-forwarded-for', 'x-forwarded-proto', 'x-bb-ip',
+            'cf-ray', 'cf-connecting-ip', 'x-vercel-id', 'x-vercel-proxy-signature'
+        ];
+
         const cleanHeaders = {};
-        const blacklist = ['host', 'connection', 'content-length', 'forwarded', 'via', 'x-nf-client-connection-ip'];
-        
         Object.keys(event.headers).forEach(key => {
             if (!blacklist.includes(key.toLowerCase())) {
                 cleanHeaders[key] = event.headers[key];
             }
         });
+
+        // Force the Host header to match the destination
         cleanHeaders['host'] = targetUrl.host;
 
-        // 3. Make the Request
+        // 4. Execute Proxy Request
         const response = await fetch(target, {
             method: event.httpMethod,
             headers: cleanHeaders,
@@ -45,20 +51,28 @@ exports.handler = async (event, context) => {
             redirect: 'follow'
         });
 
+        // 5. Prepare Response
         const responseBuffer = await response.buffer();
         
-        // 4. Return to Netlify (must be Base64 for binary support)
+        // Combine Target Headers (like content-type) with our CORS headers
+        const finalResponseHeaders = {
+            ...corsHeaders,
+            'Content-Type': response.headers.get('content-type') || 'application/octet-stream'
+        };
+
+        // 6. Return as Base64 (Essential for DRM and binary files)
         return {
             statusCode: response.status,
-            headers: {
-                'Access-Control-Allow-Origin': '*',
-                'Content-Type': response.headers.get('content-type') || 'application/octet-stream'
-            },
+            headers: finalResponseHeaders,
             body: responseBuffer.toString('base64'),
             isBase64Encoded: true
         };
 
     } catch (err) {
-        return { statusCode: 500, body: 'Netlify Proxy Error: ' + err.message };
+        return { 
+            statusCode: 500, 
+            headers: corsHeaders, 
+            body: 'Netlify Proxy Error: ' + err.message 
+        };
     }
 };
