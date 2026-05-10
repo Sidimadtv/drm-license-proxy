@@ -4,7 +4,3 @@ compatibility_date = "2026-05-10"
 
 [observability]
 enabled = true
-
-# This ensures your worker stays fast and doesn't time out during DRM handshakes
-[limits]
-cpu_ms = 50
