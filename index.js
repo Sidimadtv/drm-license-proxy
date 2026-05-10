@@ -3,7 +3,7 @@ export default {
     const url = new URL(request.url);
     const target = url.searchParams.get("target");
 
-    // 1. Standard CORS Headers
+    // 1. CORS Configuration
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
@@ -11,39 +11,80 @@ export default {
       "Access-Control-Allow-Credentials": "true",
     };
 
-    // 2. Handle CORS Preflight (OPTIONS)
+    // 2. Handle CORS Preflight
     if (request.method === "OPTIONS") {
-      return new Response(null, { 
-        headers: corsHeaders 
-      });
+      return new Response(null, { headers: corsHeaders });
     }
 
+    // 3. SHOW DASHBOARD (If no target provided)
     if (!target) {
-      return new Response("Missing target parameter", { 
-        status: 400, 
-        headers: corsHeaders 
+      const html = `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DRM License Proxy (Cloudflare)</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #f0f2f5; }
+        .card { background: white; padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid #e1e4e8; }
+        .endpoint { background: #f8f9fa; padding: 20px; margin: 20px 0; border-radius: 10px; border-left: 6px solid #f38020; }
+        code { background: #2d2d2d; color: #61afef; padding: 4px 8px; border-radius: 4px; font-family: 'Consolas', monospace; }
+        pre { background: #282c34; padding: 20px; border-radius: 10px; overflow-x: auto; }
+        pre code { color: #abb2bf; padding: 0; background: none; }
+        .example { background: #fff9db; padding: 20px; border-radius: 10px; margin: 25px 0; border-left: 6px solid #fab005; }
+        h1 { color: #1a1a1a; margin-bottom: 10px; }
+        .status-on { color: #40c057; font-weight: bold; background: #ebfbee; padding: 4px 12px; border-radius: 20px; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>🔐 DRM License Proxy</h1>
+        <p>Status: <span class="status-on">🟢 Live on Cloudflare Edge</span></p>
+        <p>This proxy server is optimized for Widevine, PlayReady, and FairPlay license requests.</p>
+        
+        <h2>📡 Available Endpoint</h2>
+        <div class="endpoint">
+            <p><strong>URL:</strong> <code>/?target=YOUR_TARGET_URL</code></p>
+            <p><strong>Example:</strong> <br><code>https://sidcdmproxy.bysidimad.workers.dev/?target=https://license.server.com</code></p>
+        </div>
+
+        <h2>🚀 JavaScript Usage</h2>
+        <div class="example">
+            <pre><code>const proxy = 'https://sidcdmproxy.bysidimad.workers.dev/?target=';
+const target = encodeURIComponent('https://license-server.com/v1/license');
+
+fetch(proxy + target, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body: drmChallengeBuffer
+});</code></pre>
+        </div>
+
+        <h2>⚙️ Security Features</h2>
+        <ul>
+            <li>✅ <strong>Zero-Logs:</strong> No request data is stored.</li>
+            <li>✅ <strong>Stealth Mode:</strong> All Cloudflare "Junk" headers are stripped.</li>
+            <li>✅ <strong>Binary Safe:</strong> Direct streaming of octet-stream buffers.</li>
+        </ul>
+    </div>
+</body>
+</html>`;
+      
+      return new Response(html, {
+        headers: { ...corsHeaders, "Content-Type": "text/html" },
       });
     }
 
+    // 4. PROXY MODE (Strict Stealth Logic)
     try {
       const targetUrl = new URL(target);
 
-      // 3. UNIVERSAL BLACKLIST
-      // We strip these headers so the target server doesn't see Cloudflare/Proxy info
+      // AGGRESSIVE BLACKLIST
       const blacklist = [
-        "cf-connecting-ip", 
-        "cf-ipcountry", 
-        "cf-ray", 
-        "cf-visitor",
-        "cf-worker",
-        "cf-ew-via",
-        "cdn-loop",
-        "connection", 
-        "content-length", 
-        "host", 
-        "x-forwarded-proto",
-        "x-real-ip", 
-        "x-frame-options"
+        "cf-connecting-ip", "cf-ipcountry", "cf-ray", "cf-visitor",
+        "cf-worker", "cf-ew-via", "cdn-loop", "connection", 
+        "content-length", "host", "forwarded", "x-forwarded-for",
+        "x-forwarded-proto", "x-forwarded-host", "x-real-ip", 
+        "via", "x-serve-by", "x-cache", "x-nf-request-id"
       ];
 
       const cleanHeaders = new Headers();
@@ -53,11 +94,15 @@ export default {
         }
       }
 
-      // Force the Host header to match the destination server
+      // Re-write Host to trick the target server
       cleanHeaders.set("Host", targetUrl.host);
 
-      // 4. Execute Proxy Request
-      // Cloudflare streams the body automatically, keeping binary data intact
+      // Optional: Set a common User-Agent if the site is strict
+      if (!cleanHeaders.has("user-agent")) {
+          cleanHeaders.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+      }
+
+      // 5. Fetch from Target
       const response = await fetch(target, {
         method: request.method,
         headers: cleanHeaders,
@@ -65,19 +110,18 @@ export default {
         redirect: "follow",
       });
 
-      // 5. Prepare Response Headers
+      // 6. Final Header Cleanup for Response
       const responseHeaders = new Headers(response.headers);
       
-      // Inject CORS headers into the final response
+      // Inject CORS
       Object.keys(corsHeaders).forEach(key => {
         responseHeaders.set(key, corsHeaders[key]);
       });
 
-      // Ensure we don't leak the target's original security headers that might break the proxy
+      // Remove target's security headers that might block browser playback
       responseHeaders.delete("content-security-policy");
       responseHeaders.delete("x-frame-options");
 
-      // 6. Return the streamed response
       return new Response(response.body, {
         status: response.status,
         statusText: response.statusText,
@@ -85,10 +129,10 @@ export default {
       });
 
     } catch (err) {
-      return new Response("Cloudflare Proxy Error: " + err.message, { 
+      return new Response("Proxy Error: " + err.message, { 
         status: 500, 
         headers: corsHeaders 
       });
     }
-  },
+  }
 };
