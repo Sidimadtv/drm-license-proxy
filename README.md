@@ -1,10 +1,10 @@
 # drm-license-proxy
 # DRM License Proxy  A simple Express.js server to proxy Widevine DRM license requests to bypass CORS or add headers.  ## 🚀 Deploy to Railway  1. Create a [Railway](https://railway.app) account (GitHub login works). 2. Click **New Project** → **Deploy from GitHub Repo**. 3. Upload this repo to your GitHub first. 4. Set the Start Command to:
 
-
+https://sidcdmproxy.bysidimad.workers.dev/?target=https://your-actual-license-server.com/path
 
 https://drm-license-proxy.vercel.app/proxy?target=https%3A%2F%2Flicense.provider.com%2Fwidevine
-
+https://drmmm.netlify.app/
 Your DRM Proxy is now fully operational. You can plug https://drmmm.netlify.app/proxy?target= into any player and start streaming!
 
 Cmd tests
