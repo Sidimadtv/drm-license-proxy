@@ -1,6 +1,6 @@
 const fetch = require('node-fetch');
 
-// CRITICAL: This tells Vercel not to mess with the binary data
+// This is mandatory for Vercel to handle raw binary DRM payloads
 export const config = {
   api: {
     bodyParser: false,
@@ -8,11 +8,11 @@ export const config = {
 };
 
 module.exports = async (req, res) => {
-  // 1. Handle CORS
+  // 1. CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Token');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  
+
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
@@ -23,23 +23,23 @@ module.exports = async (req, res) => {
   }
 
   try {
-    // 2. Collect raw binary body from the request stream
+    // 2. Read the raw body as a Buffer (Essential for DRM)
     const chunks = [];
     for await (const chunk of req) {
       chunks.push(chunk);
     }
     const rawBody = Buffer.concat(chunks);
 
-    // 3. Prepare headers for the upstream server
+    // 3. Prepare headers
     const forwardHeaders = { ...req.headers };
+    const targetUrl = new URL(target);
     
-    // Clean up headers that would confuse the target server
-    delete forwardHeaders.host;
+    forwardHeaders['host'] = targetUrl.host;
     delete forwardHeaders.cookie;
     delete forwardHeaders['content-length'];
     delete forwardHeaders['connection'];
 
-    // 4. Fetch from the actual DRM License Server
+    // 4. Execute the request
     const upstream = await fetch(target, {
       method: req.method,
       headers: forwardHeaders,
@@ -47,18 +47,18 @@ module.exports = async (req, res) => {
       redirect: 'follow'
     });
 
-    // 5. Forward the response back to the player
+    // 5. Send back the response
     res.status(upstream.status);
     
     upstream.headers.forEach((value, key) => {
-      // Don't let the upstream content-length interfere with Vercel's response
-      if (key.toLowerCase() !== 'content-length') {
+      // Don't forward transfer-encoding or content-length to avoid Vercel conflicts
+      if (!['content-length', 'transfer-encoding'].includes(key.toLowerCase())) {
         res.setHeader(key, value);
       }
     });
 
-    const responseBuffer = await upstream.buffer();
-    res.send(responseBuffer);
+    const responseData = await upstream.buffer();
+    res.send(responseData);
 
   } catch (err) {
     console.error('Proxy error:', err);
