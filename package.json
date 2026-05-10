@@ -1,0 +1,13 @@
+{
+  "name": "drm-license-proxy",
+  "version": "1.0.0",
+  "description": "Widevine License Proxy Server",
+  "main": "proxy-server.js",
+  "scripts": {
+    "start": "node proxy-server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "node-fetch": "^2.7.0"
+  }
+}
