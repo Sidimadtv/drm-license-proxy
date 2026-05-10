@@ -1,0 +1,15 @@
+[build]
+  functions = "api"
+  publish = "."
+
+# Matches your first rewrite: /proxy -> /api/proxy
+[[redirects]]
+  from = "/proxy"
+  to = "/.netlify/functions/proxy"
+  status = 200
+
+# Matches your second rewrite: everything else -> index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
