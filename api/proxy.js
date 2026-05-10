@@ -7,6 +7,7 @@ export const config = {
 };
 
 module.exports = async (req, res) => {
+  // 1. CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -17,32 +18,31 @@ module.exports = async (req, res) => {
   if (!target) return res.status(400).send('Missing target URL');
 
   try {
+    // 2. Collect Binary Body
     const chunks = [];
-    for await (const chunk of req) { chunks.push(chunk); }
+    for await (const chunk of req) {
+      chunks.push(chunk);
+    }
     const rawBody = Buffer.concat(chunks);
 
+    // 3. Prepare Headers
     const forwardHeaders = { ...req.headers };
     delete forwardHeaders.host;
-    delete forwardHeaders.cookie;
+    delete forwardHeaders.connection;
     delete forwardHeaders['content-length'];
 
-    const upstream = await fetch(target, {
+    // 4. Forward Request
+    const response = await fetch(target, {
       method: req.method,
       headers: forwardHeaders,
-      body: req.method !== 'GET' && req.method !== 'HEAD' ? rawBody : undefined,
-      redirect: 'follow'
+      body: req.method !== 'GET' && req.method !== 'HEAD' ? rawBody : undefined
     });
 
-    res.status(upstream.status);
-    upstream.headers.forEach((v, k) => {
-      if (!['content-length', 'transfer-encoding'].includes(k.toLowerCase())) {
-        res.setHeader(k, v);
-      }
-    });
-
-    const buffer = await upstream.buffer();
+    // 5. Return Response
+    res.status(response.status);
+    const buffer = await response.buffer();
     res.send(buffer);
   } catch (err) {
-    res.status(500).send('Proxy error: ' + err.message);
+    res.status(500).send('Vercel Proxy Error: ' + err.message);
   }
 };
