@@ -6,6 +6,10 @@
       "destination": "/api/proxy"
     },
     {
+      "source": "/lander",
+      "destination": "/index.html"
+    },
+    {
       "source": "/",
       "destination": "/index.html"
     }
