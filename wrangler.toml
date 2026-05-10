@@ -1,6 +1,10 @@
-name = "drm-proxy"
-main = "worker.js"
-compatibility_date = "2024-01-01"
+name = "sidcdmproxy"
+main = "index.js"
+compatibility_date = "2026-05-10"
 
 [observability]
 enabled = true
+
+# This ensures your worker stays fast and doesn't time out during DRM handshakes
+[limits]
+cpu_ms = 50
